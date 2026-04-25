@@ -24,6 +24,12 @@ const percentFormatter = new Intl.NumberFormat('en-US', {
   signDisplay: 'always'
 })
 
+const compactPercentFormatter = new Intl.NumberFormat('en-US', {
+  notation: 'compact',
+  maximumFractionDigits: 2,
+  signDisplay: 'always'
+})
+
 const compactFormatter = new Intl.NumberFormat('en-US', {
   notation: 'compact',
   maximumFractionDigits: 1
@@ -38,8 +44,12 @@ const dateFormatter = new Intl.DateTimeFormat('en-US', {
 export const formatCurrency = (value: number, currency: Currency = 'usd') =>
   (currencyFormatters[currency] ?? currencyFormatters.usd).format(Number.isFinite(value) ? value : 0)
 
-export const formatPercent = (value: number) =>
-  `${percentFormatter.format(Number.isFinite(value) ? value : 0)}%`
+export const formatPercent = (value: number) => {
+  const normalizedValue = Number.isFinite(value) ? value : 0
+  const formatter = Math.abs(normalizedValue) >= 1000 ? compactPercentFormatter : percentFormatter
+
+  return `${formatter.format(normalizedValue)}%`
+}
 
 export const formatCompactNumber = (value: number) =>
   compactFormatter.format(Number.isFinite(value) ? value : 0)

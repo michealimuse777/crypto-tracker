@@ -31,22 +31,22 @@ const liveBadgeClass = computed(() =>
 )
 const liveBadgeLabel = computed(() => {
   if (!assets.value.length) {
-    return 'Polling Ready'
+    return 'Ready'
   }
 
   if (!liveStatus.value.enabled) {
-    return 'Polling Only'
+    return 'Polling only'
   }
 
   if (liveStatus.value.state === 'open') {
-    return `Live ${liveStatus.value.liveAssets}/${liveStatus.value.totalAssets}`
+    return 'Live (Binance)'
   }
 
   if (liveStatus.value.state === 'connecting' || liveStatus.value.state === 'reconnecting') {
-    return 'Connecting Live'
+    return 'Connecting live'
   }
 
-  return 'Fallback Active'
+  return 'Fallback active'
 })
 
 const kpiCards = computed(() => [
@@ -54,10 +54,10 @@ const kpiCards = computed(() => [
     title: 'Portfolio Value',
     value: formatCurrency(summary.value.totalValue, currency.value),
     change: summary.value.dailyChangePercent,
-    helper: `${formatCurrency(summary.value.dailyChangeValue, currency.value)} 24h`
+    helper: `${formatCurrency(summary.value.dailyChangeValue, currency.value)} over 24h`
   },
   {
-    title: '24h Change',
+    title: '24h Move',
     value: formatCurrency(summary.value.dailyChangeValue, currency.value),
     change: summary.value.dailyChangePercent,
     helper: 'Weighted daily move'
@@ -84,34 +84,39 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="space-y-8">
-    <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-      <div class="max-w-3xl">
-        <p class="text-xs uppercase tracking-[0.3em] text-muted">Market Snapshot</p>
-        <h1 class="mt-2 text-lg font-medium">Live portfolio performance with cached market data underneath.</h1>
-        <p class="mt-2 text-sm leading-7 text-muted">
-          Use the dashboard for weighted daily change, allocation, movers, and live market context. When you need to modify holdings, jump to the portfolio workspace.
-        </p>
+  <div class="space-y-5 sm:space-y-6">
+    <section class="card-shell p-4 sm:p-5 lg:p-6">
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div class="max-w-3xl">
+          <p class="text-[11px] uppercase tracking-[0.3em] text-accent/80">Market Snapshot</p>
+          <h1 class="mt-3 max-w-2xl text-2xl font-semibold leading-tight sm:text-3xl">
+            Live portfolio performance built for quick scanning.
+          </h1>
+          <p class="mt-2 text-sm leading-6 text-muted">
+            Track value, 24h move, allocation, and movers in one view.
+          </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+          <span
+            class="status-pill"
+            :class="liveBadgeClass"
+          >
+            <span class="h-2 w-2 rounded-full bg-current opacity-90" />
+            {{ liveBadgeLabel }}
+          </span>
+
+          <NuxtLink
+            to="/portfolio"
+            class="control-shell rounded-xl px-4 py-2.5 text-sm font-medium text-muted hover:border-accent/30 hover:text-text"
+          >
+            Manage holdings
+          </NuxtLink>
+        </div>
       </div>
+    </section>
 
-      <div class="flex flex-wrap items-center gap-3">
-        <span
-          class="rounded-full border px-3 py-2 text-xs uppercase tracking-[0.24em]"
-          :class="liveBadgeClass"
-        >
-          {{ liveBadgeLabel }}
-        </span>
-
-        <NuxtLink
-          to="/portfolio"
-          class="rounded-xl border border-border px-4 py-3 text-sm font-medium text-muted transition hover:border-accent hover:text-text"
-        >
-          Manage portfolio
-        </NuxtLink>
-      </div>
-    </div>
-
-    <div class="grid gap-4 lg:grid-cols-3">
+    <div class="grid grid-cols-2 gap-3 lg:grid-cols-3">
       <KpiCard
         v-for="card in kpiCards"
         :key="card.title"
@@ -122,28 +127,27 @@ onBeforeUnmount(() => {
       />
     </div>
 
-    <p v-if="error" class="rounded-2xl border border-negative/40 bg-negative/10 px-4 py-3 text-sm text-negative">
+    <p v-if="error" class="rounded-xl border border-negative/40 bg-negative/10 px-4 py-3 text-sm text-negative">
       Something went wrong while refreshing prices.
       <button class="ml-2 underline" type="button" @click="refresh">Try again</button>
     </p>
 
-    <div v-if="!rows.length" class="card-shell p-8">
-      <p class="text-xs uppercase tracking-[0.3em] text-muted">Empty State</p>
-      <h2 class="mt-3 text-2xl font-semibold">Build your first tracked portfolio</h2>
-      <p class="mt-3 max-w-2xl text-sm leading-7 text-muted">
-        Search a coin, store quantity and average buy, and this dashboard will compute live value,
-        weighted daily change, allocation, and total PnL from CoinGecko polling with a Binance live-price overlay in USD mode.
+    <div v-if="!rows.length" class="card-shell p-5 sm:p-6">
+      <p class="text-[11px] uppercase tracking-[0.3em] text-muted">Empty State</p>
+      <h2 class="mt-3 text-xl font-semibold sm:text-2xl">Build your first tracked portfolio</h2>
+      <p class="mt-3 max-w-2xl text-sm leading-6 text-muted">
+        Add a coin on the portfolio page and this dashboard will fill in value, PnL, allocation, and movers.
       </p>
       <NuxtLink
         to="/portfolio"
-        class="mt-6 inline-flex rounded-xl bg-accent px-4 py-3 text-sm font-medium text-white transition hover:bg-blue-500"
+        class="mt-5 inline-flex rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-500"
       >
         Add assets
       </NuxtLink>
     </div>
 
     <template v-else>
-      <div class="grid gap-6 xl:grid-cols-2">
+      <div class="grid gap-4 xl:grid-cols-2">
         <MoversCard
           title="Top Gainers"
           :rows="topGainers"
@@ -158,7 +162,7 @@ onBeforeUnmount(() => {
         />
       </div>
 
-      <div class="grid gap-6 2xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.7fr)]">
+      <div class="grid gap-4 2xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.7fr)]">
         <div>
           <ChartCard>
             <template #eyebrow>Performance</template>
@@ -174,16 +178,10 @@ onBeforeUnmount(() => {
         </ChartCard>
       </div>
 
-      <section class="space-y-4">
-        <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p class="text-xs uppercase tracking-[0.3em] text-muted">Holdings</p>
-            <h2 class="mt-2 text-lg font-medium">Tracked assets</h2>
-          </div>
-
-          <p class="text-sm text-muted">
-            The layout stays card-first until wider screens so the data table does not force the whole dashboard to scroll sideways.
-          </p>
+      <section class="space-y-3">
+        <div>
+          <p class="text-[11px] uppercase tracking-[0.3em] text-muted">Holdings</p>
+          <h2 class="mt-2 text-base font-semibold sm:text-lg">Tracked assets</h2>
         </div>
 
         <AssetTable :rows="rows" :currency="currency" :loading="pending" />

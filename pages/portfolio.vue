@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { PortfolioAsset } from '~/types'
 import { buildPortfolioRows, summarizePortfolio } from '~/utils/calculations'
-import { formatCurrency } from '~/utils/format'
+import { formatCurrency, formatPercent } from '~/utils/format'
 
 const { assets, currency, saveAsset, removeAsset } = usePortfolio()
 
@@ -19,23 +19,24 @@ const liveBadgeClass = computed(() =>
 )
 const liveBadgeLabel = computed(() => {
   if (!assets.value.length) {
-    return 'Polling Ready'
+    return 'Ready'
   }
 
   if (!liveStatus.value.enabled) {
-    return 'Polling Only'
+    return 'Polling only'
   }
 
   if (liveStatus.value.state === 'open') {
-    return `Live ${liveStatus.value.liveAssets}/${liveStatus.value.totalAssets}`
+    return 'Live (Binance)'
   }
 
   if (liveStatus.value.state === 'connecting' || liveStatus.value.state === 'reconnecting') {
-    return 'Connecting Live'
+    return 'Connecting live'
   }
 
-  return 'Fallback Active'
+  return 'Fallback active'
 })
+const pnlToneClass = computed(() => (summary.value.totalPnl >= 0 ? 'text-positive' : 'text-negative'))
 
 const handleRefreshRequest = () => {
   void refresh()
@@ -59,79 +60,66 @@ const handleRemove = (id: string) => {
 </script>
 
 <template>
-  <div class="space-y-8">
-    <div class="grid gap-8 xl:grid-cols-[minmax(0,1.75fr)_320px]">
-      <section class="space-y-6">
-        <div class="space-y-3">
-          <p class="text-xs uppercase tracking-[0.3em] text-muted">Portfolio Builder</p>
-          <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div class="max-w-3xl">
-              <h1 class="text-lg font-medium">Add and balance your tracked holdings.</h1>
-              <p class="mt-2 text-sm leading-7 text-muted">
-                Search a coin, set quantity and cost basis, and keep your portfolio state local while CoinGecko polling and Binance live prices fill in the market side.
-              </p>
-            </div>
-
-            <span
-              class="inline-flex rounded-full border px-3 py-2 text-xs uppercase tracking-[0.24em]"
-              :class="liveBadgeClass"
-            >
-              {{ liveBadgeLabel }}
-            </span>
-          </div>
-        </div>
-
-        <CoinSearch
-          :assets="assets"
-          :currency="currency"
-          @save="handleSave"
-        />
-      </section>
-
-      <aside class="space-y-4 xl:sticky xl:top-[96px] xl:self-start">
-        <div class="card-shell p-6">
-          <p class="text-xs uppercase tracking-[0.3em] text-muted">Workspace Snapshot</p>
-          <h2 class="mt-3 text-lg font-medium">Current totals</h2>
-          <p class="mt-3 text-sm leading-7 text-muted">
-            Holdings stay in localStorage, market snapshots stay cached on the server, and USD mode can layer live Binance price updates on top.
+  <div class="space-y-5 sm:space-y-6">
+    <section class="card-shell p-4 sm:p-5 lg:p-6">
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div class="max-w-3xl">
+          <p class="text-[11px] uppercase tracking-[0.3em] text-accent/80">Portfolio Builder</p>
+          <h1 class="mt-3 max-w-2xl text-2xl font-semibold leading-tight sm:text-3xl">
+            Add and balance your tracked holdings.
+          </h1>
+          <p class="mt-2 text-sm leading-6 text-muted">
+            Search a coin, set size and cost basis, then keep the portfolio synced with market data.
           </p>
         </div>
 
-        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
-          <div class="card-shell p-5">
-            <p class="text-sm text-muted">Tracked value</p>
-            <p class="mt-3 text-3xl font-semibold">
-              {{ formatCurrency(summary.totalValue, currency) }}
-            </p>
-          </div>
+        <div class="w-full max-w-sm space-y-3">
+          <span
+            class="status-pill"
+            :class="liveBadgeClass"
+          >
+            <span class="h-2 w-2 rounded-full bg-current opacity-90" />
+            {{ liveBadgeLabel }}
+          </span>
 
-          <div class="card-shell p-5">
-            <p class="text-sm text-muted">Total PnL</p>
-            <p
-              class="mt-3 text-3xl font-semibold"
-              :class="summary.totalPnl >= 0 ? 'text-positive' : 'text-negative'"
-            >
-              {{ formatCurrency(summary.totalPnl, currency) }}
-            </p>
+          <div class="mini-stat-shell">
+            <p class="text-[11px] uppercase tracking-[0.28em] text-muted">Portfolio</p>
+            <div class="mt-3 flex items-end justify-between gap-4">
+              <div>
+                <p class="text-xl font-semibold leading-none sm:text-2xl">
+                  {{ formatCurrency(summary.totalValue, currency) }}
+                </p>
+                <p class="mt-1 text-xs text-muted">Tracked value</p>
+              </div>
+
+              <div class="text-right">
+                <p class="text-sm font-medium" :class="pnlToneClass">
+                  {{ formatCurrency(summary.totalPnl, currency) }}
+                </p>
+                <p class="mt-1 text-xs" :class="pnlToneClass">
+                  {{ formatPercent(summary.totalPnlPercent) }}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
-      </aside>
-    </div>
+      </div>
+    </section>
 
-    <p v-if="error" class="rounded-2xl border border-negative/40 bg-negative/10 px-4 py-3 text-sm text-negative">
+    <CoinSearch
+      :assets="assets"
+      :currency="currency"
+      @save="handleSave"
+    />
+
+    <p v-if="error" class="rounded-xl border border-negative/40 bg-negative/10 px-4 py-3 text-sm text-negative">
       Price refresh failed. Check your CoinGecko env config or try again.
     </p>
 
-    <section class="space-y-4">
-      <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p class="text-xs uppercase tracking-[0.3em] text-muted">Holdings</p>
-          <h2 class="mt-2 text-lg font-medium">Portfolio positions</h2>
-        </div>
-
-        <p class="text-sm text-muted">
-          Responsive cards stay visible on smaller screens, while the full table opens up once there is enough width.
-        </p>
+    <section class="space-y-3">
+      <div>
+        <p class="text-[11px] uppercase tracking-[0.3em] text-muted">Holdings</p>
+        <h2 class="mt-2 text-base font-semibold sm:text-lg">Portfolio positions</h2>
       </div>
 
       <AssetTable
