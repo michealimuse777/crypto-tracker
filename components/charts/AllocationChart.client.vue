@@ -74,19 +74,17 @@ const chartOptions = computed(() => ({
       <Pie :data="chartData" :options="chartOptions" />
     </div>
 
-    <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+    <div class="flex flex-wrap gap-2">
       <div
         v-for="item in legendItems"
         :key="item.id"
-        class="rounded-xl border border-border/70 bg-slate-950/35 px-3 py-2.5"
+        class="min-w-[220px] flex-1 rounded-xl border border-border/70 bg-slate-950/35 px-3 py-2.5"
       >
         <div class="flex items-center gap-2">
           <span class="h-2.5 w-2.5 shrink-0 rounded-full" :style="{ backgroundColor: item.color }" />
           <p class="truncate text-sm font-medium text-text">{{ item.name }}</p>
         </div>
-        <p class="mt-1 text-xs uppercase tracking-[0.18em] text-muted">
-          {{ item.symbol }} • {{ item.allocation }}%
-        </p>
+        <p class="mt-1 text-xs uppercase tracking-[0.18em] text-muted">{{ item.symbol }} - {{ item.allocation }}%</p>
       </div>
     </div>
   </div>

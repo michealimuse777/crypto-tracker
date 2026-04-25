@@ -28,11 +28,11 @@ const quantityFormatter = new Intl.NumberFormat('en-US', {
       </div>
     </div>
 
-    <div v-if="loading" class="grid gap-3 p-3 md:grid-cols-2 xl:grid-cols-1">
+    <div v-if="loading" class="flex flex-wrap gap-3 p-3 xl:block xl:space-y-3 xl:p-4">
       <div
         v-for="index in 4"
         :key="index"
-        class="animate-pulse rounded-2xl border border-border p-4"
+        class="min-w-[260px] flex-1 animate-pulse rounded-2xl border border-border p-4 xl:min-w-0"
       >
         <div class="h-4 w-1/3 rounded bg-border"></div>
         <div class="mt-3 h-6 rounded bg-border"></div>
@@ -129,11 +129,11 @@ const quantityFormatter = new Intl.NumberFormat('en-US', {
         </table>
       </div>
 
-      <div class="grid gap-3 p-3 md:grid-cols-2 xl:hidden">
+      <div class="flex flex-wrap gap-3 p-3 xl:hidden">
         <div
           v-for="row in rows"
           :key="row.id"
-          class="rounded-2xl border border-border/80 bg-slate-950/40 p-4"
+          class="min-w-[260px] flex-1 rounded-2xl border border-border/80 bg-slate-950/40 p-4"
         >
           <div class="flex items-start justify-between gap-3">
             <NuxtLink :to="`/coins/${row.id}`" class="flex min-w-0 items-center gap-3">

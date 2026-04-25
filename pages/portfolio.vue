@@ -2,6 +2,7 @@
 import type { PortfolioAsset } from '~/types'
 import { buildPortfolioRows, summarizePortfolio } from '~/utils/calculations'
 import { formatCurrency, formatPercent } from '~/utils/format'
+import { resolveLiveBadge } from '~/utils/liveStatus'
 
 const { assets, currency, saveAsset, removeAsset } = usePortfolio()
 
@@ -12,30 +13,11 @@ const { data: markets, pending, error, refresh, liveStatus } = useHybridMarkets(
 
 const rows = computed(() => buildPortfolioRows(assets.value, markets.value))
 const summary = computed(() => summarizePortfolio(rows.value))
-const liveBadgeClass = computed(() =>
-  liveStatus.value.state === 'open'
-    ? 'border-positive/30 bg-positive/10 text-positive'
-    : 'border-border text-muted'
-)
-const liveBadgeLabel = computed(() => {
-  if (!assets.value.length) {
-    return 'Ready'
-  }
-
-  if (!liveStatus.value.enabled) {
-    return 'Polling only'
-  }
-
-  if (liveStatus.value.state === 'open') {
-    return 'Live (Binance)'
-  }
-
-  if (liveStatus.value.state === 'connecting' || liveStatus.value.state === 'reconnecting') {
-    return 'Connecting live'
-  }
-
-  return 'Fallback active'
-})
+const liveBadge = computed(() => resolveLiveBadge({
+  enabled: liveStatus.value.enabled,
+  hasAssets: assets.value.length > 0,
+  state: liveStatus.value.state
+}))
 const pnlToneClass = computed(() => (summary.value.totalPnl >= 0 ? 'text-positive' : 'text-negative'))
 
 const handleRefreshRequest = () => {
@@ -76,10 +58,10 @@ const handleRemove = (id: string) => {
         <div class="w-full max-w-sm space-y-3">
           <span
             class="status-pill"
-            :class="liveBadgeClass"
+            :class="liveBadge.className"
           >
             <span class="h-2 w-2 rounded-full bg-current opacity-90" />
-            {{ liveBadgeLabel }}
+            {{ liveBadge.label }}
           </span>
 
           <div class="mini-stat-shell">

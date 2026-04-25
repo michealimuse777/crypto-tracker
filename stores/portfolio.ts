@@ -1,10 +1,13 @@
 import { defineStore } from 'pinia'
-import type { Currency, PortfolioAsset } from '~/types'
+import type { AssetType, Currency, PortfolioAsset } from '~/types'
 
 interface PortfolioState {
   assets: PortfolioAsset[]
   currency: Currency
 }
+
+type BaseNormalizedAsset = Omit<PortfolioAsset, 'type' | 'entry' | 'leverage'>
+type AssetNormalizer = (asset: Partial<PortfolioAsset>, baseAsset: BaseNormalizedAsset) => PortfolioAsset
 
 const storageKeys = {
   assets: 'portfolio',
@@ -25,6 +28,27 @@ const toFiniteNumber = (value: unknown, fallback = 0) => (
     : fallback
 )
 
+const toOptionalFiniteNumber = (value: unknown) => (
+  typeof value === 'number' && Number.isFinite(value)
+    ? value
+    : undefined
+)
+
+const normalizeAssetType = (value: unknown): AssetType => (value === 'futures' ? 'futures' : 'spot')
+
+const assetNormalizers: Record<AssetType, AssetNormalizer> = {
+  spot: (_asset, baseAsset) => ({
+    ...baseAsset,
+    type: 'spot'
+  }),
+  futures: (asset, baseAsset) => ({
+    ...baseAsset,
+    type: 'futures',
+    entry: toOptionalFiniteNumber(asset.entry),
+    leverage: toOptionalFiniteNumber(asset.leverage)
+  })
+}
+
 const normalizeAsset = (asset: Partial<PortfolioAsset>): PortfolioAsset | null => {
   const id = typeof asset.id === 'string' ? asset.id.trim() : ''
   const name = typeof asset.name === 'string' ? asset.name.trim() : ''
@@ -34,7 +58,8 @@ const normalizeAsset = (asset: Partial<PortfolioAsset>): PortfolioAsset | null =
     return null
   }
 
-  return {
+  const type = normalizeAssetType(asset.type)
+  const baseAsset: BaseNormalizedAsset = {
     id,
     name,
     symbol,
@@ -43,11 +68,10 @@ const normalizeAsset = (asset: Partial<PortfolioAsset>): PortfolioAsset | null =
     purchaseDate: typeof asset.purchaseDate === 'string' && asset.purchaseDate
       ? asset.purchaseDate
       : defaultPurchaseDate(),
-    type: asset.type === 'futures' ? 'futures' : 'spot',
-    image: typeof asset.image === 'string' ? asset.image : undefined,
-    entry: typeof asset.entry === 'number' && Number.isFinite(asset.entry) ? asset.entry : undefined,
-    leverage: typeof asset.leverage === 'number' && Number.isFinite(asset.leverage) ? asset.leverage : undefined
+    image: typeof asset.image === 'string' ? asset.image : undefined
   }
+
+  return assetNormalizers[type](asset, baseAsset)
 }
 
 export const usePortfolioStore = defineStore('portfolio', {

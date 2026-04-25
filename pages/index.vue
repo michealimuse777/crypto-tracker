@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { buildPortfolioRows, buildPortfolioTrend, summarizePortfolio } from '~/utils/calculations'
 import { formatCurrency } from '~/utils/format'
+import { resolveLiveBadge } from '~/utils/liveStatus'
 
 const { assets, currency } = usePortfolio()
 
@@ -24,30 +25,11 @@ const topLosers = computed(() =>
     .sort((left, right) => left.dailyChangePercent - right.dailyChangePercent)
     .slice(0, 3)
 )
-const liveBadgeClass = computed(() =>
-  liveStatus.value.state === 'open'
-    ? 'border-positive/30 bg-positive/10 text-positive'
-    : 'border-border text-muted'
-)
-const liveBadgeLabel = computed(() => {
-  if (!assets.value.length) {
-    return 'Ready'
-  }
-
-  if (!liveStatus.value.enabled) {
-    return 'Polling only'
-  }
-
-  if (liveStatus.value.state === 'open') {
-    return 'Live (Binance)'
-  }
-
-  if (liveStatus.value.state === 'connecting' || liveStatus.value.state === 'reconnecting') {
-    return 'Connecting live'
-  }
-
-  return 'Fallback active'
-})
+const liveBadge = computed(() => resolveLiveBadge({
+  enabled: liveStatus.value.enabled,
+  hasAssets: assets.value.length > 0,
+  state: liveStatus.value.state
+}))
 
 const kpiCards = computed(() => [
   {
@@ -100,10 +82,10 @@ onBeforeUnmount(() => {
         <div class="flex flex-wrap items-center gap-2.5">
           <span
             class="status-pill"
-            :class="liveBadgeClass"
+            :class="liveBadge.className"
           >
             <span class="h-2 w-2 rounded-full bg-current opacity-90" />
-            {{ liveBadgeLabel }}
+            {{ liveBadge.label }}
           </span>
 
           <NuxtLink
@@ -118,12 +100,13 @@ onBeforeUnmount(() => {
 
     <div class="grid grid-cols-2 gap-3 lg:grid-cols-3">
       <KpiCard
-        v-for="card in kpiCards"
+        v-for="(card, index) in kpiCards"
         :key="card.title"
         :title="card.title"
         :value="card.value"
         :change="card.change"
         :helper="card.helper"
+        :class="index === kpiCards.length - 1 && kpiCards.length % 2 === 1 ? 'col-span-2 lg:col-span-1' : ''"
       />
     </div>
 

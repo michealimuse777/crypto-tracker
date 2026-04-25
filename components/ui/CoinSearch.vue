@@ -237,18 +237,18 @@ const submitAsset = () => {
         </div>
       </div>
 
-      <div class="grid gap-3 border-t border-border/60 pt-5 sm:grid-cols-2 xl:grid-cols-3">
-        <label class="space-y-2 text-sm text-muted">
+      <div class="flex flex-wrap gap-3 border-t border-border/60 pt-5">
+        <label class="min-w-[220px] flex-1 space-y-2 text-sm text-muted">
           <span>Quantity</span>
           <input v-model.number="quantity" class="input-shell" min="0" step="any" type="number" />
         </label>
 
-        <label class="space-y-2 text-sm text-muted">
+        <label class="min-w-[220px] flex-1 space-y-2 text-sm text-muted">
           <span>Average Buy</span>
           <input v-model.number="avgBuy" class="input-shell" min="0" step="any" type="number" />
         </label>
 
-        <label class="space-y-2 text-sm text-muted">
+        <label class="min-w-[220px] flex-1 space-y-2 text-sm text-muted">
           <span>Position Type</span>
           <select v-model="assetType" class="input-shell">
             <option value="spot">Spot</option>

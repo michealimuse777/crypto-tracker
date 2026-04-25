@@ -31,8 +31,36 @@ interface BinanceTickerMessage {
 
 type BinanceServerMessage = BinanceStatusMessage | BinanceErrorMessage | BinanceTickerMessage
 type ConnectionTransport = 'bridge' | 'direct'
+type TransportStrategy = {
+  createSocketUrl: (groups: BinanceStreamGroup[], directBinanceBase: string) => string
+  errorMessage: string
+}
+type ServerMessageHandlers = {
+  [K in BinanceServerMessage['type']]: (
+    payload: Extract<BinanceServerMessage, { type: K }>,
+    groups: BinanceStreamGroup[]
+  ) => void
+}
 
 const reconnectDelayMs = 3_000
+const bridgeHosts = new Set(['localhost', '127.0.0.1'])
+
+const transportStrategies: Record<ConnectionTransport, TransportStrategy> = {
+  bridge: {
+    createSocketUrl: (groups) => {
+      const url = new URL('/ws/binance', window.location.origin)
+      url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+      url.searchParams.set('streams', groups.map((group) => group.stream).join(','))
+      return String(url)
+    },
+    errorMessage: 'Binance live price bridge connection failed.'
+  },
+  direct: {
+    createSocketUrl: (groups, directBinanceBase) =>
+      `${directBinanceBase}/stream?streams=${groups.map((group) => group.stream).join('/')}`,
+    errorMessage: 'Binance live price connection failed.'
+  }
+}
 
 const parseServerMessage = (payload: string) => {
   try {
@@ -120,22 +148,29 @@ export const useBinanceLivePrices = (
       return 'bridge'
     }
 
-    const hostname = window.location.hostname
-
-    return hostname === 'localhost' || hostname === '127.0.0.1'
-      ? 'bridge'
-      : 'direct'
+    return bridgeHosts.has(window.location.hostname) ? 'bridge' : 'direct'
   }
 
-  const createSocketUrl = (transport: ConnectionTransport, groups: BinanceStreamGroup[]) => {
-    if (transport === 'direct') {
-      return `${directBinanceBase.value}/stream?streams=${groups.map((group) => group.stream).join('/')}`
+  const serverMessageHandlers: ServerMessageHandlers = {
+    ticker: (payload, groups) => {
+      applyTickerUpdate(groups, payload.data)
+    },
+    status: (payload) => {
+      status.value = payload.data.state
+    },
+    error: (payload) => {
+      error.value = new Error(payload.data.message)
+      status.value = 'error'
     }
+  }
 
-    const url = new URL('/ws/binance', window.location.origin)
-    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-    url.searchParams.set('streams', groups.map((group) => group.stream).join(','))
-    return String(url)
+  const handleServerMessage = (payload: BinanceServerMessage, groups: BinanceStreamGroup[]) => {
+    const handler = serverMessageHandlers[payload.type] as (
+      message: BinanceServerMessage,
+      streamGroups: BinanceStreamGroup[]
+    ) => void
+
+    handler(payload, groups)
   }
 
   const connect = async () => {
@@ -159,7 +194,8 @@ export const useBinanceLivePrices = (
     error.value = null
     status.value = 'connecting'
     const transport = resolveTransport()
-    const nextSocket = new WebSocket(createSocketUrl(transport, groups))
+    const transportStrategy = transportStrategies[transport]
+    const nextSocket = new WebSocket(transportStrategy.createSocketUrl(groups, directBinanceBase.value))
     socket.value = nextSocket
 
     nextSocket.addEventListener('open', () => {
@@ -177,19 +213,8 @@ export const useBinanceLivePrices = (
 
       const payload = parseServerMessage(event.data)
 
-      if (payload?.type === 'ticker') {
-        applyTickerUpdate(groups, payload.data)
-        return
-      }
-
-      if (payload?.type === 'status') {
-        status.value = payload.data.state
-        return
-      }
-
-      if (payload?.type === 'error') {
-        error.value = new Error(payload.data.message)
-        status.value = 'error'
+      if (payload) {
+        handleServerMessage(payload, groups)
         return
       }
 
@@ -207,11 +232,7 @@ export const useBinanceLivePrices = (
         return
       }
 
-      error.value = new Error(
-        transport === 'bridge'
-          ? 'Binance live price bridge connection failed.'
-          : 'Binance live price connection failed.'
-      )
+      error.value = new Error(transportStrategy.errorMessage)
       status.value = 'error'
     })
 
