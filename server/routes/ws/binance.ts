@@ -1,5 +1,5 @@
 import type { Peer } from 'crossws'
-import type { BinanceTickerSnapshot, LiveConnectionState } from '~/utils/binance'
+import { parseBinanceCombinedStreamMessage, type BinanceTickerSnapshot, type LiveConnectionState } from '~/utils/binance'
 
 interface PeerContext {
   namespaceKey: string
@@ -60,31 +60,6 @@ const parseRequestedStreams = (request: { url: string }) => {
     .flatMap((value) => value.split('/'))
     .map((value) => value.trim().toLowerCase())
     .filter((value) => streamPattern.test(value)))].sort()
-}
-
-const parseTickerSnapshot = (payload: string): BinanceTickerSnapshot | null => {
-  try {
-    const parsed = JSON.parse(payload) as {
-      data?: Record<string, unknown>
-      stream?: string
-    }
-
-    if (!parsed.stream || !parsed.data) {
-      return null
-    }
-
-    return {
-      currentPrice: Number(parsed.data.c ?? 0),
-      eventTime: Number(parsed.data.E ?? Date.now()),
-      high24h: parsed.data.h ? Number(parsed.data.h) : null,
-      low24h: parsed.data.l ? Number(parsed.data.l) : null,
-      priceChangePercent24h: parsed.data.P ? Number(parsed.data.P) : null,
-      stream: parsed.stream,
-      symbol: String(parsed.data.s ?? '')
-    }
-  } catch {
-    return null
-  }
 }
 
 const closeUpstreamConnection = (connection: UpstreamConnection) => {
@@ -175,7 +150,7 @@ const connectUpstream = (connection: UpstreamConnection) => {
       return
     }
 
-    const snapshot = parseTickerSnapshot(event.data)
+    const snapshot = parseBinanceCombinedStreamMessage(event.data)
 
     if (!snapshot) {
       return

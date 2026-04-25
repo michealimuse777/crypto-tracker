@@ -5,7 +5,8 @@ import {
   type BinanceTickerSnapshot,
   type LiveConnectionState,
   buildBinanceStreamGroups,
-  isBinanceLiveCurrency
+  isBinanceLiveCurrency,
+  parseBinanceCombinedStreamMessage
 } from '~/utils/binance'
 
 interface BinanceStatusMessage {
@@ -29,6 +30,7 @@ interface BinanceTickerMessage {
 }
 
 type BinanceServerMessage = BinanceStatusMessage | BinanceErrorMessage | BinanceTickerMessage
+type ConnectionTransport = 'bridge' | 'direct'
 
 const reconnectDelayMs = 3_000
 
@@ -47,6 +49,7 @@ export const useBinanceLivePrices = (
   } = {}
 ) => {
   const currency = options.currency ?? 'usd'
+  const config = useRuntimeConfig()
   const snapshotsById = ref<Record<string, BinanceTickerSnapshot>>({})
   const status = ref<LiveConnectionState>('idle')
   const error = ref<Error | null>(null)
@@ -59,6 +62,7 @@ export const useBinanceLivePrices = (
   const streamSignature = computed(() => streamGroups.value.map((group) => group.stream).join(','))
   const activeStreams = computed(() => streamGroups.value.length)
   const liveAssets = computed(() => Object.keys(snapshotsById.value).length)
+  const directBinanceBase = computed(() => config.public.binanceWsBase || 'wss://data-stream.binance.vision')
 
   const clearReconnectTimer = () => {
     if (reconnectTimer) {
@@ -111,6 +115,29 @@ export const useBinanceLivePrices = (
     }, reconnectDelayMs)
   }
 
+  const resolveTransport = (): ConnectionTransport => {
+    if (import.meta.server) {
+      return 'bridge'
+    }
+
+    const hostname = window.location.hostname
+
+    return hostname === 'localhost' || hostname === '127.0.0.1'
+      ? 'bridge'
+      : 'direct'
+  }
+
+  const createSocketUrl = (transport: ConnectionTransport, groups: BinanceStreamGroup[]) => {
+    if (transport === 'direct') {
+      return `${directBinanceBase.value}/stream?streams=${groups.map((group) => group.stream).join('/')}`
+    }
+
+    const url = new URL('/ws/binance', window.location.origin)
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+    url.searchParams.set('streams', groups.map((group) => group.stream).join(','))
+    return String(url)
+  }
+
   const connect = async () => {
     if (import.meta.server) {
       return
@@ -131,12 +158,8 @@ export const useBinanceLivePrices = (
     closeSocket(1000, 'Refreshing live streams')
     error.value = null
     status.value = 'connecting'
-
-    const url = new URL('/ws/binance', window.location.origin)
-    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-    url.searchParams.set('streams', groups.map((group) => group.stream).join(','))
-
-    const nextSocket = new WebSocket(url)
+    const transport = resolveTransport()
+    const nextSocket = new WebSocket(createSocketUrl(transport, groups))
     socket.value = nextSocket
 
     nextSocket.addEventListener('open', () => {
@@ -154,22 +177,29 @@ export const useBinanceLivePrices = (
 
       const payload = parseServerMessage(event.data)
 
-      if (!payload) {
-        return
-      }
-
-      if (payload.type === 'ticker') {
+      if (payload?.type === 'ticker') {
         applyTickerUpdate(groups, payload.data)
         return
       }
 
-      if (payload.type === 'status') {
+      if (payload?.type === 'status') {
         status.value = payload.data.state
         return
       }
 
-      error.value = new Error(payload.data.message)
-      status.value = 'error'
+      if (payload?.type === 'error') {
+        error.value = new Error(payload.data.message)
+        status.value = 'error'
+        return
+      }
+
+      const directSnapshot = parseBinanceCombinedStreamMessage(event.data)
+
+      if (!directSnapshot) {
+        return
+      }
+
+      applyTickerUpdate(groups, directSnapshot)
     })
 
     nextSocket.addEventListener('error', () => {
@@ -177,7 +207,11 @@ export const useBinanceLivePrices = (
         return
       }
 
-      error.value = new Error('Binance live price connection failed.')
+      error.value = new Error(
+        transport === 'bridge'
+          ? 'Binance live price bridge connection failed.'
+          : 'Binance live price connection failed.'
+      )
       status.value = 'error'
     })
 
