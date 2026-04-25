@@ -5,9 +5,9 @@ Crypto Tracker is a Nuxt 3 portfolio dashboard for manually tracked crypto holdi
 ## Features
 
 - Portfolio dashboard with total value, 24h move, total PnL, allocation, and top gainers/losers
-- Manual asset management with add, edit, delete, duplicate prevention, and purchase date support
+- Manual asset management with add, delete, and same-coin replace behavior
 - Coin search backed by server-side CoinGecko routes
-- Responsive holdings table with mobile card layout
+- Responsive holdings table with mobile card layout and mobile currency switching in the top bar
 - Coin detail page with market stats, 30 day history, and user-specific holding PnL
 - LocalStorage persistence for holdings and selected currency
 - Server-side caching to reduce CoinGecko traffic
@@ -145,6 +145,6 @@ The current workspace has been verified with:
 ## Future Improvements
 
 - Stronger Binance symbol mapping for edge-case assets
-- Better futures-specific entry and leverage editing
+- Better futures-specific entry and leverage controls
 - Broader live support for non-USD currencies
-- Automated test coverage for portfolio calculations and edit flows
+- Automated test coverage for portfolio calculations and save/replace flows

@@ -13,11 +13,11 @@ const toneClass = (value: number) => (value >= 0 ? 'text-positive' : 'text-negat
 </script>
 
 <template>
-  <div class="card-shell p-5">
+  <div class="card-shell p-6">
     <div class="flex items-center justify-between gap-3">
       <div>
         <p class="text-xs uppercase tracking-[0.3em] text-muted">Market Movers</p>
-        <h3 class="mt-2 text-xl font-semibold">{{ title }}</h3>
+        <h3 class="mt-2 text-lg font-medium">{{ title }}</h3>
       </div>
       <span class="rounded-full border border-border px-3 py-1 text-xs uppercase tracking-[0.24em] text-muted">
         {{ rows.length }} assets

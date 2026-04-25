@@ -7,14 +7,21 @@
 @layer base {
   html {
     color-scheme: dark;
+    overflow-x: hidden;
+  }
+
+  #__nuxt {
+    overflow-x: hidden;
   }
 
   body {
     @apply bg-bg font-sans text-text antialiased;
     background-image:
-      radial-gradient(circle at top, rgba(59, 130, 246, 0.08), transparent 28%),
+      radial-gradient(circle at 10% 0%, rgba(59, 130, 246, 0.12), transparent 28%),
+      radial-gradient(circle at 88% 16%, rgba(16, 185, 129, 0.08), transparent 24%),
       linear-gradient(180deg, rgba(17, 24, 39, 0.98), rgba(11, 15, 20, 1));
     min-height: 100vh;
+    overflow-x: hidden;
   }
 
   ::selection {
@@ -24,14 +31,14 @@
 
 @layer components {
   .card-shell {
-    @apply rounded-2xl border border-border bg-card/90;
+    @apply rounded-[26px] border border-border/80 bg-card/80 shadow-[0_24px_80px_-40px_rgba(15,23,42,0.9)] backdrop-blur-sm;
   }
 
   .input-shell {
-    @apply w-full rounded-xl border border-border bg-slate-950/70 px-4 py-3 text-sm text-text outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20;
+    @apply w-full rounded-2xl border border-border/80 bg-slate-950/65 px-4 py-3 text-sm text-text outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20;
   }
 
   .table-head {
-    @apply bg-slate-900/70 text-left text-xs uppercase tracking-[0.2em] text-muted;
+    @apply bg-slate-900/70 text-left text-[11px] uppercase tracking-[0.18em] text-muted;
   }
 }

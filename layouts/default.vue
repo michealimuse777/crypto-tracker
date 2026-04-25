@@ -1,15 +1,15 @@
 <template>
-  <div class="min-h-screen bg-bg text-text">
-    <div class="flex min-h-screen">
-      <Sidebar />
+  <div class="min-h-screen overflow-x-hidden bg-bg text-text">
+    <Sidebar />
 
-      <div class="flex min-w-0 flex-1 flex-col">
-        <Topbar />
+    <div class="min-h-screen lg:pl-56">
+      <Topbar />
 
-        <main class="flex-1 overflow-y-auto px-4 py-6 md:px-6">
+      <main class="overflow-x-hidden px-4 py-6 sm:px-6 lg:px-8">
+        <div class="mr-auto w-full max-w-[1500px]">
           <slot />
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   </div>
 </template>

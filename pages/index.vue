@@ -69,14 +69,29 @@ const kpiCards = computed(() => [
     helper: `${formatCurrency(summary.value.totalCostBasis, currency.value)} cost basis`
   }
 ])
+
+const handleRefreshRequest = () => {
+  void refresh()
+}
+
+onMounted(() => {
+  window.addEventListener('crypto-tracker:refresh-markets', handleRefreshRequest)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('crypto-tracker:refresh-markets', handleRefreshRequest)
+})
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <p class="text-xs uppercase tracking-[0.3em] text-muted">Overview</p>
-        <h1 class="mt-2 text-3xl font-semibold">Portfolio dashboard</h1>
+  <div class="space-y-8">
+    <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+      <div class="max-w-3xl">
+        <p class="text-xs uppercase tracking-[0.3em] text-muted">Market Snapshot</p>
+        <h1 class="mt-2 text-lg font-medium">Live portfolio performance with cached market data underneath.</h1>
+        <p class="mt-2 text-sm leading-7 text-muted">
+          Use the dashboard for weighted daily change, allocation, movers, and live market context. When you need to modify holdings, jump to the portfolio workspace.
+        </p>
       </div>
 
       <div class="flex flex-wrap items-center gap-3">
@@ -96,7 +111,7 @@ const kpiCards = computed(() => [
       </div>
     </div>
 
-    <div class="grid gap-4 md:grid-cols-3">
+    <div class="grid gap-4 lg:grid-cols-3">
       <KpiCard
         v-for="card in kpiCards"
         :key="card.title"
@@ -107,7 +122,7 @@ const kpiCards = computed(() => [
       />
     </div>
 
-    <p v-if="error" class="rounded-xl border border-negative/40 bg-negative/10 px-4 py-3 text-sm text-negative">
+    <p v-if="error" class="rounded-2xl border border-negative/40 bg-negative/10 px-4 py-3 text-sm text-negative">
       Something went wrong while refreshing prices.
       <button class="ml-2 underline" type="button" @click="refresh">Try again</button>
     </p>
@@ -128,7 +143,7 @@ const kpiCards = computed(() => [
     </div>
 
     <template v-else>
-      <div class="grid gap-4 xl:grid-cols-2">
+      <div class="grid gap-6 xl:grid-cols-2">
         <MoversCard
           title="Top Gainers"
           :rows="topGainers"
@@ -143,8 +158,8 @@ const kpiCards = computed(() => [
         />
       </div>
 
-      <div class="grid gap-4 xl:grid-cols-3">
-        <div class="xl:col-span-2">
+      <div class="grid gap-6 2xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.7fr)]">
+        <div>
           <ChartCard>
             <template #eyebrow>Performance</template>
             <template #title>Portfolio Value</template>
@@ -159,7 +174,20 @@ const kpiCards = computed(() => [
         </ChartCard>
       </div>
 
-      <AssetTable :rows="rows" :currency="currency" :loading="pending" />
+      <section class="space-y-4">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p class="text-xs uppercase tracking-[0.3em] text-muted">Holdings</p>
+            <h2 class="mt-2 text-lg font-medium">Tracked assets</h2>
+          </div>
+
+          <p class="text-sm text-muted">
+            The layout stays card-first until wider screens so the data table does not force the whole dashboard to scroll sideways.
+          </p>
+        </div>
+
+        <AssetTable :rows="rows" :currency="currency" :loading="pending" />
+      </section>
     </template>
   </div>
 </template>

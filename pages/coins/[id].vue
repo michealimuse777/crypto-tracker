@@ -2,7 +2,7 @@
 import type { CoinDetail, CoinHistoryResponse } from '~/types'
 import { calculatePnL } from '~/utils/pnlStrategies'
 import { buildHistoryPoints } from '~/utils/calculations'
-import { formatCompactNumber, formatCurrency, formatDate, formatPercent, stripHtml } from '~/utils/format'
+import { formatCompactNumber, formatCurrency, formatPercent, stripHtml } from '~/utils/format'
 
 const route = useRoute()
 const { assets, currency } = usePortfolio()
@@ -152,10 +152,6 @@ const holdingPnL = computed(() => (
               <div class="flex items-center justify-between gap-4">
                 <span class="text-sm text-muted">Average Buy</span>
                 <span>{{ formatCurrency(holding.avgBuy, currency) }}</span>
-              </div>
-              <div class="flex items-center justify-between gap-4">
-                <span class="text-sm text-muted">Purchase Date</span>
-                <span>{{ formatDate(holding.purchaseDate) }}</span>
               </div>
               <div class="flex items-center justify-between gap-4">
                 <span class="text-sm text-muted">Current Value</span>

@@ -2,27 +2,16 @@
 import type { CoinSearchResponse, CoinSearchResult, Currency, PortfolioAsset } from '~/types'
 import { formatCurrency } from '~/utils/format'
 
-interface SavePayload {
-  asset: PortfolioAsset
-  originalId?: string
-}
-
 const props = defineProps<{
   assets: PortfolioAsset[]
   currency: Currency
-  editingAsset?: PortfolioAsset | null
 }>()
 
 const emit = defineEmits<{
-  save: [payload: SavePayload]
-  cancel: []
+  save: [asset: PortfolioAsset]
 }>()
 
 const { fetcher } = useApi()
-
-const defaultPurchaseDate = () => new Date().toISOString().slice(0, 10)
-
-const formCard = ref<HTMLElement | null>(null)
 const query = ref('')
 const results = ref<CoinSearchResult[]>([])
 const pending = ref(false)
@@ -31,12 +20,10 @@ const selected = ref<CoinSearchResult | null>(null)
 const selecting = ref(false)
 const quantity = ref(1)
 const avgBuy = ref(0)
-const purchaseDate = ref(defaultPurchaseDate())
 const assetType = ref<PortfolioAsset['type']>('spot')
 
-const isEditing = computed(() => Boolean(props.editingAsset))
 const hasSelectedCoin = computed(() => Boolean(selected.value))
-const selectedImage = computed(() => selected.value?.thumb || selected.value?.large || props.editingAsset?.image || '')
+const selectedImage = computed(() => selected.value?.thumb || selected.value?.large || '')
 const searchPlaceholder = computed(() => (
   hasSelectedCoin.value
     ? 'Selected coin locked. Use Change coin to search again.'
@@ -49,9 +36,9 @@ const duplicateAsset = computed(() => {
     return null
   }
 
-  return props.assets.find((asset) => asset.id === selectedId && asset.id !== props.editingAsset?.id) ?? null
+  return props.assets.find((asset) => asset.id === selectedId) ?? null
 })
-const actionLabel = computed(() => (isEditing.value ? 'Update asset' : 'Add to portfolio'))
+const actionLabel = computed(() => (duplicateAsset.value ? 'Replace holding' : 'Add holding'))
 
 const setSelectedCoin = (coin: CoinSearchResult) => {
   selecting.value = true
@@ -74,7 +61,6 @@ const resetForm = () => {
   selected.value = null
   quantity.value = 1
   avgBuy.value = 0
-  purchaseDate.value = defaultPurchaseDate()
   assetType.value = 'spot'
   errorMessage.value = ''
 }
@@ -125,39 +111,6 @@ watch(
   { flush: 'post' }
 )
 
-watch(
-  () => props.editingAsset,
-  async (asset) => {
-    errorMessage.value = ''
-    results.value = []
-
-    if (!asset) {
-      resetForm()
-      return
-    }
-
-    setSelectedCoin({
-      id: asset.id,
-      name: asset.name,
-      symbol: asset.symbol,
-      thumb: asset.image,
-      large: asset.image,
-      current_price: null
-    })
-    quantity.value = asset.quantity
-    avgBuy.value = asset.avgBuy
-    purchaseDate.value = asset.purchaseDate || defaultPurchaseDate()
-    assetType.value = asset.type ?? 'spot'
-
-    await nextTick()
-    formCard.value?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start'
-    })
-  },
-  { immediate: true }
-)
-
 const submitAsset = () => {
   const parsedQuantity = Number(quantity.value)
   const parsedAvgBuy = Number(avgBuy.value)
@@ -177,60 +130,37 @@ const submitAsset = () => {
     return
   }
 
-  if (!purchaseDate.value) {
-    errorMessage.value = 'Choose a purchase date before saving.'
-    return
-  }
-
-  if (duplicateAsset.value) {
-    errorMessage.value = `${duplicateAsset.value.name} is already in your portfolio. Use Edit instead.`
-    return
-  }
-
   emit('save', {
-    originalId: props.editingAsset?.id,
-    asset: {
-      id: selected.value.id,
-      name: selected.value.name,
-      symbol: selected.value.symbol.toUpperCase(),
-      image: selected.value.thumb || selected.value.large || props.editingAsset?.image,
-      quantity: parsedQuantity,
-      avgBuy: parsedAvgBuy,
-      purchaseDate: purchaseDate.value,
-      type: assetType.value,
-      entry: assetType.value === 'futures' && props.editingAsset?.type === 'futures'
-        ? props.editingAsset.entry
-        : undefined,
-      leverage: assetType.value === 'futures' && props.editingAsset?.type === 'futures'
-        ? props.editingAsset.leverage
-        : undefined
-    }
+    id: selected.value.id,
+    name: selected.value.name,
+    symbol: selected.value.symbol.toUpperCase(),
+    image: selected.value.thumb || selected.value.large,
+    quantity: parsedQuantity,
+    avgBuy: parsedAvgBuy,
+    type: assetType.value
   })
 
-  if (!isEditing.value) {
-    resetForm()
-  }
+  resetForm()
 }
 </script>
 
 <template>
-  <div ref="formCard" class="card-shell p-6">
+  <div class="card-shell p-6 lg:p-8">
     <div class="flex items-start justify-between gap-4">
       <div>
-        <p class="text-xs uppercase tracking-[0.3em] text-muted">
-          {{ isEditing ? 'Edit Holding' : 'Search' }}
+        <p class="text-xs uppercase tracking-[0.3em] text-muted">Search</p>
+        <h3 class="mt-2 text-xl font-semibold">Add an asset</h3>
+        <p class="mt-3 max-w-2xl text-sm leading-7 text-muted">
+          Search by coin name, choose the exact asset, then capture quantity and average buy in one pass.
         </p>
-        <h3 class="mt-2 text-xl font-semibold">
-          {{ isEditing ? 'Update an asset' : 'Add an asset' }}
-        </h3>
       </div>
 
-      <span class="rounded-full border border-border px-3 py-1 text-xs uppercase tracking-[0.24em] text-muted">
-        {{ isEditing ? 'Editing' : 'Cached API' }}
+      <span class="rounded-full border border-border/80 px-3 py-1 text-xs uppercase tracking-[0.24em] text-muted">
+        Cached API
       </span>
     </div>
 
-    <div class="mt-6 space-y-4">
+    <div class="mt-8 space-y-6">
       <div class="relative">
         <input
           v-model="query"
@@ -278,7 +208,7 @@ const submitAsset = () => {
 
       <div
         v-if="selected"
-        class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-slate-950/50 px-4 py-3"
+        class="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-border/80 bg-slate-950/35 px-4 py-4"
       >
         <div class="flex items-center gap-3">
           <img
@@ -307,7 +237,7 @@ const submitAsset = () => {
         </div>
       </div>
 
-      <div class="grid gap-4 md:grid-cols-4">
+      <div class="grid gap-4 border-t border-border/60 pt-6 sm:grid-cols-2 xl:grid-cols-3">
         <label class="space-y-2 text-sm text-muted">
           <span>Quantity</span>
           <input v-model.number="quantity" class="input-shell" min="0" step="any" type="number" />
@@ -319,11 +249,6 @@ const submitAsset = () => {
         </label>
 
         <label class="space-y-2 text-sm text-muted">
-          <span>Purchase Date</span>
-          <input v-model="purchaseDate" class="input-shell" type="date" />
-        </label>
-
-        <label class="space-y-2 text-sm text-muted">
           <span>Position Type</span>
           <select v-model="assetType" class="input-shell">
             <option value="spot">Spot</option>
@@ -332,31 +257,22 @@ const submitAsset = () => {
         </label>
       </div>
 
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <p class="text-sm text-muted">
+      <div class="flex flex-col gap-4 border-t border-border/60 pt-6 lg:flex-row lg:items-end lg:justify-between">
+        <p class="max-w-2xl text-sm leading-7 text-muted">
           {{
             duplicateAsset
-              ? `${duplicateAsset.name} is already tracked. Edit that row instead of creating a duplicate.`
+              ? `${duplicateAsset.name} is already tracked. Saving again will replace its stored quantity and average buy.`
               : selected && selected.current_price != null
                 ? `Selected ${selected.name}. Current market price: ${formatCurrency(selected.current_price, currency)}.`
                 : selected
-                  ? `Selected ${selected.name}. Save quantity, average buy, and purchase date to your local portfolio.`
-                  : 'Pick a coin, then save quantity, average buy, and purchase date to your local portfolio.'
+                  ? `Selected ${selected.name}. Save quantity and average buy to your local portfolio.`
+                  : 'Pick a coin, then save quantity and average buy to your local portfolio.'
           }}
         </p>
 
-        <div class="flex flex-wrap items-center gap-3">
+        <div class="flex w-full flex-col gap-3 sm:flex-row sm:justify-end lg:w-auto">
           <button
-            v-if="isEditing"
-            class="rounded-xl border border-border px-4 py-3 text-sm font-medium text-muted transition hover:border-border/70 hover:text-text"
-            type="button"
-            @click="emit('cancel')"
-          >
-            Cancel
-          </button>
-
-          <button
-            class="rounded-xl bg-accent px-4 py-3 text-sm font-medium text-white transition hover:bg-blue-500"
+            class="w-full rounded-xl bg-accent px-4 py-3 text-sm font-medium text-white transition hover:bg-blue-500 sm:w-auto"
             type="button"
             @click="submitAsset"
           >

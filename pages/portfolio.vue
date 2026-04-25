@@ -3,11 +3,6 @@ import type { PortfolioAsset } from '~/types'
 import { buildPortfolioRows, summarizePortfolio } from '~/utils/calculations'
 import { formatCurrency } from '~/utils/format'
 
-interface SavePayload {
-  asset: PortfolioAsset
-  originalId?: string
-}
-
 const { assets, currency, saveAsset, removeAsset } = usePortfolio()
 
 const { data: markets, pending, error, refresh, liveStatus } = useHybridMarkets(
@@ -15,10 +10,8 @@ const { data: markets, pending, error, refresh, liveStatus } = useHybridMarkets(
   { currency }
 )
 
-const editingAssetId = ref<string | null>(null)
 const rows = computed(() => buildPortfolioRows(assets.value, markets.value))
 const summary = computed(() => summarizePortfolio(rows.value))
-const editingAsset = computed(() => assets.value.find((asset) => asset.id === editingAssetId.value) ?? null)
 const liveBadgeClass = computed(() =>
   liveStatus.value.state === 'open'
     ? 'border-positive/30 bg-positive/10 text-positive'
@@ -44,99 +37,110 @@ const liveBadgeLabel = computed(() => {
   return 'Fallback Active'
 })
 
-const handleSave = ({ asset, originalId }: SavePayload) => {
-  saveAsset(asset, originalId)
-  editingAssetId.value = null
+const handleRefreshRequest = () => {
+  void refresh()
 }
 
-const handleEdit = (id: string) => {
-  editingAssetId.value = id
+onMounted(() => {
+  window.addEventListener('crypto-tracker:refresh-markets', handleRefreshRequest)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('crypto-tracker:refresh-markets', handleRefreshRequest)
+})
+
+const handleSave = (asset: PortfolioAsset) => {
+  saveAsset(asset)
 }
 
 const handleRemove = (id: string) => {
-  if (editingAssetId.value === id) {
-    editingAssetId.value = null
-  }
-
   removeAsset(id)
 }
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <p class="text-xs uppercase tracking-[0.3em] text-muted">Workspace</p>
-        <h1 class="mt-2 text-3xl font-semibold">Portfolio builder</h1>
-      </div>
+  <div class="space-y-8">
+    <div class="grid gap-8 xl:grid-cols-[minmax(0,1.75fr)_320px]">
+      <section class="space-y-6">
+        <div class="space-y-3">
+          <p class="text-xs uppercase tracking-[0.3em] text-muted">Portfolio Builder</p>
+          <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div class="max-w-3xl">
+              <h1 class="text-lg font-medium">Add and balance your tracked holdings.</h1>
+              <p class="mt-2 text-sm leading-7 text-muted">
+                Search a coin, set quantity and cost basis, and keep your portfolio state local while CoinGecko polling and Binance live prices fill in the market side.
+              </p>
+            </div>
 
-      <div class="flex flex-wrap items-center gap-3">
-        <span
-          class="rounded-full border px-3 py-2 text-xs uppercase tracking-[0.24em]"
-          :class="liveBadgeClass"
-        >
-          {{ liveBadgeLabel }}
-        </span>
+            <span
+              class="inline-flex rounded-full border px-3 py-2 text-xs uppercase tracking-[0.24em]"
+              :class="liveBadgeClass"
+            >
+              {{ liveBadgeLabel }}
+            </span>
+          </div>
+        </div>
 
-        <button
-          class="rounded-xl border border-border px-4 py-3 text-sm font-medium text-muted transition hover:border-accent hover:text-text"
-          type="button"
-          @click="refresh"
-        >
-          Refresh prices
-        </button>
-      </div>
-    </div>
+        <CoinSearch
+          :assets="assets"
+          :currency="currency"
+          @save="handleSave"
+        />
+      </section>
 
-    <div class="grid gap-6 xl:grid-cols-[1.2fr,0.8fr]">
-      <CoinSearch
-        :assets="assets"
-        :currency="currency"
-        :editing-asset="editingAsset"
-        @save="handleSave"
-        @cancel="editingAssetId = null"
-      />
+      <aside class="space-y-4 xl:sticky xl:top-[96px] xl:self-start">
+        <div class="card-shell p-6">
+          <p class="text-xs uppercase tracking-[0.3em] text-muted">Workspace Snapshot</p>
+          <h2 class="mt-3 text-lg font-medium">Current totals</h2>
+          <p class="mt-3 text-sm leading-7 text-muted">
+            Holdings stay in localStorage, market snapshots stay cached on the server, and USD mode can layer live Binance price updates on top.
+          </p>
+        </div>
 
-      <div class="card-shell p-6">
-        <p class="text-xs uppercase tracking-[0.3em] text-muted">Snapshot</p>
-        <h2 class="mt-2 text-2xl font-semibold">Current totals</h2>
-
-        <div class="mt-6 space-y-4">
-          <div class="rounded-2xl border border-border bg-slate-950/50 p-4">
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+          <div class="card-shell p-5">
             <p class="text-sm text-muted">Tracked value</p>
-            <p class="mt-2 text-2xl font-semibold">
+            <p class="mt-3 text-3xl font-semibold">
               {{ formatCurrency(summary.totalValue, currency) }}
             </p>
           </div>
 
-          <div class="rounded-2xl border border-border bg-slate-950/50 p-4">
+          <div class="card-shell p-5">
             <p class="text-sm text-muted">Total PnL</p>
             <p
-              class="mt-2 text-2xl font-semibold"
+              class="mt-3 text-3xl font-semibold"
               :class="summary.totalPnl >= 0 ? 'text-positive' : 'text-negative'"
             >
               {{ formatCurrency(summary.totalPnl, currency) }}
             </p>
           </div>
-
-          <p class="text-sm leading-7 text-muted">
-            This page stores holdings in localStorage, keeps CoinGecko polling as the baseline, and layers Binance global live prices on top when USD mode is active.
-          </p>
         </div>
-      </div>
+      </aside>
     </div>
 
-    <p v-if="error" class="rounded-xl border border-negative/40 bg-negative/10 px-4 py-3 text-sm text-negative">
+    <p v-if="error" class="rounded-2xl border border-negative/40 bg-negative/10 px-4 py-3 text-sm text-negative">
       Price refresh failed. Check your CoinGecko env config or try again.
     </p>
 
-    <AssetTable
-      :rows="rows"
+    <section class="space-y-4">
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p class="text-xs uppercase tracking-[0.3em] text-muted">Holdings</p>
+          <h2 class="mt-2 text-lg font-medium">Portfolio positions</h2>
+        </div>
+
+        <p class="text-sm text-muted">
+          Responsive cards stay visible on smaller screens, while the full table opens up once there is enough width.
+        </p>
+      </div>
+
+      <AssetTable
+        :rows="rows"
         :currency="currency"
         :loading="pending"
         removable
-        @edit="handleEdit"
         @remove="handleRemove"
       />
+    </section>
   </div>
 </template>
