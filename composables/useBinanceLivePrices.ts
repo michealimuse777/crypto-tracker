@@ -44,6 +44,11 @@ type ServerMessageHandlers = {
 
 const reconnectDelayMs = 3_000
 const bridgeHosts = new Set(['localhost', '127.0.0.1'])
+const fallbackDirectBinanceBases = [
+  'wss://stream.binance.com:443',
+  'wss://stream.binance.com:9443',
+  'wss://data-stream.binance.vision'
+]
 
 const transportStrategies: Record<ConnectionTransport, TransportStrategy> = {
   bridge: {
@@ -90,7 +95,16 @@ export const useBinanceLivePrices = (
   const streamSignature = computed(() => streamGroups.value.map((group) => group.stream).join(','))
   const activeStreams = computed(() => streamGroups.value.length)
   const liveAssets = computed(() => Object.keys(snapshotsById.value).length)
-  const directBinanceBase = computed(() => config.public.binanceWsBase || 'wss://data-stream.binance.vision')
+  const directBinanceBases = computed(() => {
+    const configuredBase = typeof config.public.binanceWsBase === 'string'
+      ? config.public.binanceWsBase.trim()
+      : ''
+
+    return [...new Set([
+      configuredBase,
+      ...fallbackDirectBinanceBases
+    ].filter(Boolean))]
+  })
 
   const clearReconnectTimer = () => {
     if (reconnectTimer) {
@@ -173,6 +187,114 @@ export const useBinanceLivePrices = (
     handler(payload, groups)
   }
 
+  const connectSocket = (
+    version: number,
+    groups: BinanceStreamGroup[],
+    transport: ConnectionTransport,
+    directBaseIndex = 0
+  ) => {
+    const transportStrategy = transportStrategies[transport]
+    const directBase = transport === 'direct'
+      ? directBinanceBases.value[directBaseIndex] ?? fallbackDirectBinanceBases[0]
+      : ''
+    const nextSocket = new WebSocket(transportStrategy.createSocketUrl(groups, directBase))
+    let opened = false
+
+    socket.value = nextSocket
+
+    const moveToNextDirectBase = () => {
+      if (transport !== 'direct') {
+        return false
+      }
+
+      const nextBaseIndex = directBaseIndex + 1
+
+      if (nextBaseIndex >= directBinanceBases.value.length) {
+        return false
+      }
+
+      if (connectionVersion.value !== version || socket.value !== nextSocket) {
+        return true
+      }
+
+      socket.value = null
+
+      if (nextSocket.readyState === WebSocket.OPEN || nextSocket.readyState === WebSocket.CONNECTING) {
+        nextSocket.close(1000, 'Trying fallback Binance endpoint')
+      }
+
+      status.value = 'connecting'
+      connectSocket(version, groups, transport, nextBaseIndex)
+      return true
+    }
+
+    nextSocket.addEventListener('open', () => {
+      if (connectionVersion.value !== version || socket.value !== nextSocket) {
+        return
+      }
+
+      opened = true
+      status.value = 'open'
+    })
+
+    nextSocket.addEventListener('message', (event) => {
+      if (connectionVersion.value !== version || socket.value !== nextSocket || typeof event.data !== 'string') {
+        return
+      }
+
+      const payload = parseServerMessage(event.data)
+
+      if (payload) {
+        handleServerMessage(payload, groups)
+        return
+      }
+
+      const directSnapshot = parseBinanceCombinedStreamMessage(event.data)
+
+      if (!directSnapshot) {
+        return
+      }
+
+      applyTickerUpdate(groups, directSnapshot)
+    })
+
+    nextSocket.addEventListener('error', () => {
+      if (connectionVersion.value !== version || socket.value !== nextSocket) {
+        return
+      }
+
+      if (moveToNextDirectBase()) {
+        return
+      }
+
+      error.value = new Error(transportStrategy.errorMessage)
+      status.value = 'error'
+    })
+
+    nextSocket.addEventListener('close', () => {
+      if (connectionVersion.value !== version || socket.value !== nextSocket) {
+        return
+      }
+
+      socket.value = null
+
+      if (!opened && moveToNextDirectBase()) {
+        return
+      }
+
+      if (!streamGroups.value.length) {
+        status.value = 'idle'
+        return
+      }
+
+      if (status.value !== 'error') {
+        status.value = 'closed'
+      }
+
+      scheduleReconnect()
+    })
+  }
+
   const connect = async () => {
     if (import.meta.server) {
       return
@@ -194,66 +316,7 @@ export const useBinanceLivePrices = (
     error.value = null
     status.value = 'connecting'
     const transport = resolveTransport()
-    const transportStrategy = transportStrategies[transport]
-    const nextSocket = new WebSocket(transportStrategy.createSocketUrl(groups, directBinanceBase.value))
-    socket.value = nextSocket
-
-    nextSocket.addEventListener('open', () => {
-      if (connectionVersion.value !== version) {
-        return
-      }
-
-      status.value = 'open'
-    })
-
-    nextSocket.addEventListener('message', (event) => {
-      if (connectionVersion.value !== version || typeof event.data !== 'string') {
-        return
-      }
-
-      const payload = parseServerMessage(event.data)
-
-      if (payload) {
-        handleServerMessage(payload, groups)
-        return
-      }
-
-      const directSnapshot = parseBinanceCombinedStreamMessage(event.data)
-
-      if (!directSnapshot) {
-        return
-      }
-
-      applyTickerUpdate(groups, directSnapshot)
-    })
-
-    nextSocket.addEventListener('error', () => {
-      if (connectionVersion.value !== version) {
-        return
-      }
-
-      error.value = new Error(transportStrategy.errorMessage)
-      status.value = 'error'
-    })
-
-    nextSocket.addEventListener('close', () => {
-      if (connectionVersion.value !== version) {
-        return
-      }
-
-      socket.value = null
-
-      if (!streamGroups.value.length) {
-        status.value = 'idle'
-        return
-      }
-
-      if (status.value !== 'error') {
-        status.value = 'closed'
-      }
-
-      scheduleReconnect()
-    })
+    connectSocket(version, groups, transport)
   }
 
   watch(
