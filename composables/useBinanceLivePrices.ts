@@ -69,7 +69,20 @@ const transportStrategies: Record<ConnectionTransport, TransportStrategy> = {
 
 const parseServerMessage = (payload: string) => {
   try {
-    return JSON.parse(payload) as BinanceServerMessage
+    const parsed = JSON.parse(payload) as {
+      data?: unknown
+      type?: unknown
+    }
+
+    if (
+      (parsed.type !== 'ticker' && parsed.type !== 'status' && parsed.type !== 'error')
+      || typeof parsed.data !== 'object'
+      || parsed.data === null
+    ) {
+      return null
+    }
+
+    return parsed as BinanceServerMessage
   } catch {
     return null
   }
