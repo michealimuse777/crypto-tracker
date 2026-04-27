@@ -150,7 +150,7 @@ const holdingPnL = computed(() => (
                 <span>{{ holding.quantity }}</span>
               </div>
               <div class="flex items-center justify-between gap-4">
-                <span class="text-sm text-muted">Average Buy</span>
+                <span class="text-sm text-muted">Tracked At</span>
                 <span>{{ formatCurrency(holding.avgBuy, currency) }}</span>
               </div>
               <div class="flex items-center justify-between gap-4">

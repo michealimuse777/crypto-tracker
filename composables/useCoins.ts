@@ -1,6 +1,8 @@
 import type { MaybeRefOrGetter } from 'vue'
 import type { Currency, MarketCoin, PollingSpeed } from '~/types'
 
+const retryDelayMs = 5_000
+
 export const useCoins = (
   ids: MaybeRefOrGetter<string[]>,
   options: {
@@ -13,15 +15,26 @@ export const useCoins = (
   const error = ref<Error | null>(null)
   const currency = options.currency ?? 'usd'
   const speed = options.speed ?? 'medium'
+  let retryTimer: ReturnType<typeof setTimeout> | null = null
+
+  const clearRetryTimer = () => {
+    if (retryTimer) {
+      clearTimeout(retryTimer)
+      retryTimer = null
+    }
+  }
 
   const fetchPrices = async () => {
     const currentIds = [...new Set(toValue(ids).filter(Boolean))]
 
     if (!currentIds.length) {
+      clearRetryTimer()
       data.value = []
+      error.value = null
       return
     }
 
+    clearRetryTimer()
     pending.value = true
 
     try {
@@ -34,6 +47,13 @@ export const useCoins = (
       error.value = null
     } catch (caughtError) {
       error.value = caughtError as Error
+
+      if (import.meta.client && !retryTimer) {
+        retryTimer = setTimeout(() => {
+          retryTimer = null
+          void fetchPrices()
+        }, retryDelayMs)
+      }
     } finally {
       pending.value = false
     }
@@ -45,6 +65,10 @@ export const useCoins = (
 
   watch([() => toValue(ids).join(','), () => toValue(currency)], () => {
     void fetchPrices()
+  })
+
+  onBeforeUnmount(() => {
+    clearRetryTimer()
   })
 
   return {

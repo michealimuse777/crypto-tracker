@@ -45,14 +45,13 @@ const quantityFormatter = new Intl.NumberFormat('en-US', {
 
     <template v-else>
       <div class="hidden overflow-x-auto px-3 pb-3 xl:block">
-        <table class="min-w-[980px] w-full text-sm">
+        <table class="min-w-[920px] w-full text-sm">
           <thead class="table-head">
             <tr>
               <th class="px-3 py-3">Coin</th>
               <th class="px-3 py-3">Symbol</th>
               <th class="px-3 py-3 text-right">Quantity</th>
               <th class="px-3 py-3">Price</th>
-              <th class="px-3 py-3">Avg Buy</th>
               <th class="px-3 py-3">Current Value</th>
               <th class="px-3 py-3">PnL</th>
               <th class="px-3 py-3">24h Change</th>
@@ -91,9 +90,6 @@ const quantityFormatter = new Intl.NumberFormat('en-US', {
                   MC {{ formatCompactNumber(row.market.market_cap) }} / Vol {{ formatCompactNumber(row.market.total_volume) }}
                 </p>
                 <p v-else class="text-xs text-muted">Market data pending</p>
-              </td>
-              <td class="px-3 py-3.5">
-                <p class="font-medium whitespace-nowrap text-text">{{ formatCurrency(row.avgBuy, currency) }}</p>
               </td>
               <td class="px-3 py-3.5">
                 <p class="font-medium whitespace-nowrap text-text">{{ formatCurrency(row.holdingsValue, currency) }}</p>
@@ -185,7 +181,7 @@ const quantityFormatter = new Intl.NumberFormat('en-US', {
           </div>
 
           <div class="mt-3 space-y-1.5 rounded-xl border border-border/70 bg-slate-950/30 p-3 text-xs text-muted">
-            <p>Avg buy: {{ formatCurrency(row.avgBuy, currency) }}</p>
+            <p>Tracked cost: {{ formatCurrency(row.costBasis, currency) }}</p>
             <p v-if="row.market">
               Market cap {{ formatCompactNumber(row.market.market_cap) }} / Volume {{ formatCompactNumber(row.market.total_volume) }}
             </p>

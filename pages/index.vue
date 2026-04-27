@@ -5,7 +5,7 @@ import { resolveLiveBadge } from '~/utils/liveStatus'
 
 const { assets, currency } = usePortfolio()
 
-const { data: markets, pending, error, refresh, liveStatus } = useHybridMarkets(
+const { data: markets, pending, refresh, liveStatus } = useHybridMarkets(
   assets,
   { currency }
 )
@@ -109,11 +109,6 @@ onBeforeUnmount(() => {
         :class="index === kpiCards.length - 1 && kpiCards.length % 2 === 1 ? 'col-span-2 lg:col-span-1' : ''"
       />
     </div>
-
-    <p v-if="error" class="rounded-xl border border-negative/40 bg-negative/10 px-4 py-3 text-sm text-negative">
-      Something went wrong while refreshing prices.
-      <button class="ml-2 underline" type="button" @click="refresh">Try again</button>
-    </p>
 
     <div v-if="!rows.length" class="card-shell p-5 sm:p-6">
       <p class="text-[11px] uppercase tracking-[0.3em] text-muted">Empty State</p>

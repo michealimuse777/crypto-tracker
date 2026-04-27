@@ -6,7 +6,7 @@ import { resolveLiveBadge } from '~/utils/liveStatus'
 
 const { assets, currency, saveAsset, removeAsset } = usePortfolio()
 
-const { data: markets, pending, error, refresh, liveStatus } = useHybridMarkets(
+const { data: markets, pending, refresh, liveStatus } = useHybridMarkets(
   assets,
   { currency }
 )
@@ -51,7 +51,7 @@ const handleRemove = (id: string) => {
             Add and balance your tracked holdings.
           </h1>
           <p class="mt-2 text-sm leading-6 text-muted">
-            Search a coin, set size and cost basis, then keep the portfolio synced with market data.
+            Search a coin, set the amount you want to track, then keep the portfolio synced with market data.
           </p>
         </div>
 
@@ -93,10 +93,6 @@ const handleRemove = (id: string) => {
       :currency="currency"
       @save="handleSave"
     />
-
-    <p v-if="error" class="rounded-xl border border-negative/40 bg-negative/10 px-4 py-3 text-sm text-negative">
-      Price refresh failed. Check your CoinGecko env config or try again.
-    </p>
 
     <section class="space-y-3">
       <div>

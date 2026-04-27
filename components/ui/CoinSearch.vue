@@ -18,12 +18,16 @@ const pending = ref(false)
 const errorMessage = ref('')
 const selected = ref<CoinSearchResult | null>(null)
 const selecting = ref(false)
-const quantity = ref(1)
-const avgBuy = ref(0)
-const assetType = ref<PortfolioAsset['type']>('spot')
+const quantityInput = ref('1')
+const valueInput = ref('')
 
 const hasSelectedCoin = computed(() => Boolean(selected.value))
 const selectedImage = computed(() => selected.value?.thumb || selected.value?.large || '')
+const selectedPrice = computed(() => (
+  typeof selected.value?.current_price === 'number' && Number.isFinite(selected.value.current_price)
+    ? selected.value.current_price
+    : null
+))
 const searchPlaceholder = computed(() => (
   hasSelectedCoin.value
     ? 'Selected coin locked. Use Change coin to search again.'
@@ -40,11 +44,51 @@ const duplicateAsset = computed(() => {
 })
 const actionLabel = computed(() => (duplicateAsset.value ? 'Replace holding' : 'Add holding'))
 
+const formatNumericInput = (value: number, maxFractionDigits = 8) => {
+  if (!Number.isFinite(value)) {
+    return ''
+  }
+
+  return value
+    .toFixed(maxFractionDigits)
+    .replace(/\.?0+$/, '')
+}
+
+const syncValueFromQuantity = () => {
+  if (!selectedPrice.value) {
+    valueInput.value = ''
+    return
+  }
+
+  const parsedQuantity = Number(quantityInput.value)
+  valueInput.value = Number.isFinite(parsedQuantity) && parsedQuantity > 0
+    ? formatNumericInput(parsedQuantity * selectedPrice.value, 2)
+    : ''
+}
+
+const syncQuantityFromValue = () => {
+  if (!selectedPrice.value) {
+    return
+  }
+
+  const parsedValue = Number(valueInput.value)
+  quantityInput.value = Number.isFinite(parsedValue) && parsedValue > 0
+    ? formatNumericInput(parsedValue / selectedPrice.value)
+    : ''
+}
+
 const setSelectedCoin = (coin: CoinSearchResult) => {
   selecting.value = true
   selected.value = coin
   query.value = `${coin.name} (${coin.symbol.toUpperCase()})`
   results.value = []
+
+  if (valueInput.value.trim()) {
+    syncQuantityFromValue()
+    return
+  }
+
+  syncValueFromQuantity()
 }
 
 const clearSelectedCoin = () => {
@@ -59,9 +103,8 @@ const resetForm = () => {
   results.value = []
   pending.value = false
   selected.value = null
-  quantity.value = 1
-  avgBuy.value = 0
-  assetType.value = 'spot'
+  quantityInput.value = '1'
+  valueInput.value = ''
   errorMessage.value = ''
 }
 
@@ -112,21 +155,26 @@ watch(
 )
 
 const submitAsset = () => {
-  const parsedQuantity = Number(quantity.value)
-  const parsedAvgBuy = Number(avgBuy.value)
-
   if (!selected.value) {
     errorMessage.value = 'Choose a coin before saving.'
     return
   }
 
-  if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
-    errorMessage.value = 'Choose a coin and enter a quantity greater than zero.'
+  const parsedQuantity = Number(quantityInput.value)
+  const parsedValue = Number(valueInput.value)
+  const hasExactValue = Number.isFinite(parsedValue) && parsedValue > 0
+
+  if (hasExactValue && !selectedPrice.value) {
+    errorMessage.value = 'Current market price is unavailable for this coin right now. Try again shortly.'
     return
   }
 
-  if (!Number.isFinite(parsedAvgBuy) || parsedAvgBuy < 0) {
-    errorMessage.value = 'Average buy price must be zero or greater.'
+  const resolvedQuantity = hasExactValue
+    ? parsedValue / (selectedPrice.value ?? 1)
+    : parsedQuantity
+
+  if (!Number.isFinite(resolvedQuantity) || resolvedQuantity <= 0) {
+    errorMessage.value = 'Enter a quantity or exact value greater than zero.'
     return
   }
 
@@ -135,9 +183,9 @@ const submitAsset = () => {
     name: selected.value.name,
     symbol: selected.value.symbol.toUpperCase(),
     image: selected.value.thumb || selected.value.large,
-    quantity: parsedQuantity,
-    avgBuy: parsedAvgBuy,
-    type: assetType.value
+    quantity: resolvedQuantity,
+    avgBuy: selectedPrice.value ?? 0,
+    type: 'spot'
   })
 
   resetForm()
@@ -151,7 +199,7 @@ const submitAsset = () => {
         <p class="text-[11px] uppercase tracking-[0.3em] text-muted">Search</p>
         <h3 class="mt-2 text-lg font-semibold sm:text-xl">Add an asset</h3>
         <p class="mt-2 max-w-2xl text-sm leading-6 text-muted">
-          Search a coin, set size and cost basis, then save it in one pass.
+          Search a coin, enter quantity or exact value, then save it in one pass.
         </p>
       </div>
 
@@ -240,20 +288,26 @@ const submitAsset = () => {
       <div class="flex flex-wrap gap-3 border-t border-border/60 pt-5">
         <label class="min-w-[220px] flex-1 space-y-2 text-sm text-muted">
           <span>Quantity</span>
-          <input v-model.number="quantity" class="input-shell" min="0" step="any" type="number" />
+          <input
+            v-model="quantityInput"
+            class="input-shell"
+            min="0"
+            step="any"
+            type="number"
+            @input="syncValueFromQuantity"
+          />
         </label>
 
         <label class="min-w-[220px] flex-1 space-y-2 text-sm text-muted">
-          <span>Average Buy</span>
-          <input v-model.number="avgBuy" class="input-shell" min="0" step="any" type="number" />
-        </label>
-
-        <label class="min-w-[220px] flex-1 space-y-2 text-sm text-muted">
-          <span>Position Type</span>
-          <select v-model="assetType" class="input-shell">
-            <option value="spot">Spot</option>
-            <option value="futures">Futures</option>
-          </select>
+          <span>Exact Value</span>
+          <input
+            v-model="valueInput"
+            class="input-shell"
+            min="0"
+            step="any"
+            type="number"
+            @input="syncQuantityFromValue"
+          />
         </label>
       </div>
 
@@ -261,12 +315,12 @@ const submitAsset = () => {
         <p class="max-w-2xl text-sm leading-6 text-muted">
           {{
             duplicateAsset
-              ? `${duplicateAsset.name} is already tracked. Saving again will replace its stored quantity and average buy.`
+              ? `${duplicateAsset.name} is already tracked. Saving again will replace its stored amount.`
               : selected && selected.current_price != null
-                ? `Selected ${selected.name}. Current market price: ${formatCurrency(selected.current_price, currency)}.`
+                ? `Selected ${selected.name}. Current market price: ${formatCurrency(selected.current_price, currency)}. Enter quantity or an exact value to track.`
                 : selected
-                  ? `Selected ${selected.name}. Save quantity and average buy to your local portfolio.`
-                  : 'Pick a coin, then save quantity and average buy to your local portfolio.'
+                  ? `Selected ${selected.name}. Save a quantity or exact value to your local portfolio.`
+                  : 'Pick a coin, then enter a quantity or exact value to track locally.'
           }}
         </p>
 
