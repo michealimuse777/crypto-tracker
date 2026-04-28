@@ -20,6 +20,8 @@ const selected = ref<CoinSearchResult | null>(null)
 const selecting = ref(false)
 const quantityInput = ref('1')
 const valueInput = ref('')
+const activeInput = ref<'quantity' | 'value' | null>(null)
+let isSyncingInputs = false
 
 const hasSelectedCoin = computed(() => Boolean(selected.value))
 const selectedImage = computed(() => selected.value?.thumb || selected.value?.large || '')
@@ -44,6 +46,30 @@ const duplicateAsset = computed(() => {
 })
 const actionLabel = computed(() => (duplicateAsset.value ? 'Replace holding' : 'Add holding'))
 
+const normalizeDecimalInput = (value: string) => {
+  const normalized = value
+    .replace(/,/g, '.')
+    .replace(/[^\d.]/g, '')
+
+  if (!normalized) {
+    return ''
+  }
+
+  const [wholePart, ...fractionParts] = normalized.split('.')
+
+  if (!fractionParts.length) {
+    return wholePart
+  }
+
+  const fraction = fractionParts.join('')
+  return wholePart ? `${wholePart}.${fraction}` : `0.${fraction}`
+}
+
+const parseDecimalInput = (value: string) => {
+  const parsed = Number(normalizeDecimalInput(value))
+  return Number.isFinite(parsed) ? parsed : Number.NaN
+}
+
 const formatNumericInput = (value: number, maxFractionDigits = 8) => {
   if (!Number.isFinite(value)) {
     return ''
@@ -60,7 +86,7 @@ const syncValueFromQuantity = () => {
     return
   }
 
-  const parsedQuantity = Number(quantityInput.value)
+  const parsedQuantity = parseDecimalInput(quantityInput.value)
   valueInput.value = Number.isFinite(parsedQuantity) && parsedQuantity > 0
     ? formatNumericInput(parsedQuantity * selectedPrice.value, 2)
     : ''
@@ -71,10 +97,39 @@ const syncQuantityFromValue = () => {
     return
   }
 
-  const parsedValue = Number(valueInput.value)
+  const parsedValue = parseDecimalInput(valueInput.value)
   quantityInput.value = Number.isFinite(parsedValue) && parsedValue > 0
     ? formatNumericInput(parsedValue / selectedPrice.value)
     : ''
+}
+
+const syncLinkedInput = (source: 'quantity' | 'value') => {
+  if (isSyncingInputs) {
+    return
+  }
+
+  isSyncingInputs = true
+
+  try {
+    if (source === 'quantity') {
+      syncValueFromQuantity()
+      return
+    }
+
+    syncQuantityFromValue()
+  } finally {
+    isSyncingInputs = false
+  }
+}
+
+const handleQuantityInput = (event: Event) => {
+  activeInput.value = 'quantity'
+  quantityInput.value = normalizeDecimalInput((event.target as HTMLInputElement).value)
+}
+
+const handleValueInput = (event: Event) => {
+  activeInput.value = 'value'
+  valueInput.value = normalizeDecimalInput((event.target as HTMLInputElement).value)
 }
 
 const setSelectedCoin = (coin: CoinSearchResult) => {
@@ -96,6 +151,7 @@ const clearSelectedCoin = () => {
   query.value = ''
   results.value = []
   errorMessage.value = ''
+  activeInput.value = null
 }
 
 const resetForm = () => {
@@ -106,7 +162,39 @@ const resetForm = () => {
   quantityInput.value = '1'
   valueInput.value = ''
   errorMessage.value = ''
+  activeInput.value = null
 }
+
+watch(quantityInput, () => {
+  if (activeInput.value !== 'quantity') {
+    return
+  }
+
+  syncLinkedInput('quantity')
+})
+
+watch(valueInput, () => {
+  if (activeInput.value !== 'value') {
+    return
+  }
+
+  syncLinkedInput('value')
+})
+
+watch(selectedPrice, () => {
+  if (!selected.value) {
+    return
+  }
+
+  if (activeInput.value === 'value' && valueInput.value.trim()) {
+    syncLinkedInput('value')
+    return
+  }
+
+  if (quantityInput.value.trim()) {
+    syncLinkedInput('quantity')
+  }
+})
 
 watch(
   [query, () => props.currency],
@@ -160,8 +248,8 @@ const submitAsset = () => {
     return
   }
 
-  const parsedQuantity = Number(quantityInput.value)
-  const parsedValue = Number(valueInput.value)
+  const parsedQuantity = parseDecimalInput(quantityInput.value)
+  const parsedValue = parseDecimalInput(valueInput.value)
   const hasExactValue = Number.isFinite(parsedValue) && parsedValue > 0
 
   if (hasExactValue && !selectedPrice.value) {
@@ -289,24 +377,28 @@ const submitAsset = () => {
         <label class="min-w-[220px] flex-1 space-y-2 text-sm text-muted">
           <span>Quantity</span>
           <input
-            v-model="quantityInput"
+            :value="quantityInput"
             class="input-shell"
+            inputmode="decimal"
             min="0"
             step="any"
-            type="number"
-            @input="syncValueFromQuantity"
+            type="text"
+            @focus="activeInput = 'quantity'"
+            @input="handleQuantityInput"
           />
         </label>
 
         <label class="min-w-[220px] flex-1 space-y-2 text-sm text-muted">
           <span>Exact Value</span>
           <input
-            v-model="valueInput"
+            :value="valueInput"
             class="input-shell"
+            inputmode="decimal"
             min="0"
             step="any"
-            type="number"
-            @input="syncQuantityFromValue"
+            type="text"
+            @focus="activeInput = 'value'"
+            @input="handleValueInput"
           />
         </label>
       </div>
