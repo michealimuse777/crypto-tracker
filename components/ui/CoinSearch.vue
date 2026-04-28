@@ -20,7 +20,6 @@ const selected = ref<CoinSearchResult | null>(null)
 const selecting = ref(false)
 const quantityInput = ref('1')
 const valueInput = ref('')
-const activeInput = ref<'quantity' | 'value' | null>(null)
 let isSyncingInputs = false
 
 const hasSelectedCoin = computed(() => Boolean(selected.value))
@@ -122,15 +121,21 @@ const syncLinkedInput = (source: 'quantity' | 'value') => {
   }
 }
 
-const handleQuantityInput = (event: Event) => {
-  activeInput.value = 'quantity'
-  quantityInput.value = normalizeDecimalInput((event.target as HTMLInputElement).value)
-}
+const quantityModel = computed({
+  get: () => quantityInput.value,
+  set: (value: string) => {
+    quantityInput.value = normalizeDecimalInput(value)
+    syncLinkedInput('quantity')
+  }
+})
 
-const handleValueInput = (event: Event) => {
-  activeInput.value = 'value'
-  valueInput.value = normalizeDecimalInput((event.target as HTMLInputElement).value)
-}
+const valueModel = computed({
+  get: () => valueInput.value,
+  set: (value: string) => {
+    valueInput.value = normalizeDecimalInput(value)
+    syncLinkedInput('value')
+  }
+})
 
 const setSelectedCoin = (coin: CoinSearchResult) => {
   selecting.value = true
@@ -151,7 +156,6 @@ const clearSelectedCoin = () => {
   query.value = ''
   results.value = []
   errorMessage.value = ''
-  activeInput.value = null
 }
 
 const resetForm = () => {
@@ -162,31 +166,14 @@ const resetForm = () => {
   quantityInput.value = '1'
   valueInput.value = ''
   errorMessage.value = ''
-  activeInput.value = null
 }
-
-watch(quantityInput, () => {
-  if (activeInput.value !== 'quantity') {
-    return
-  }
-
-  syncLinkedInput('quantity')
-})
-
-watch(valueInput, () => {
-  if (activeInput.value !== 'value') {
-    return
-  }
-
-  syncLinkedInput('value')
-})
 
 watch(selectedPrice, () => {
   if (!selected.value) {
     return
   }
 
-  if (activeInput.value === 'value' && valueInput.value.trim()) {
+  if (valueInput.value.trim()) {
     syncLinkedInput('value')
     return
   }
@@ -377,28 +364,24 @@ const submitAsset = () => {
         <label class="min-w-[220px] flex-1 space-y-2 text-sm text-muted">
           <span>Quantity</span>
           <input
-            :value="quantityInput"
+            v-model="quantityModel"
             class="input-shell"
             inputmode="decimal"
             min="0"
             step="any"
             type="text"
-            @focus="activeInput = 'quantity'"
-            @input="handleQuantityInput"
           />
         </label>
 
         <label class="min-w-[220px] flex-1 space-y-2 text-sm text-muted">
           <span>Exact Value</span>
           <input
-            :value="valueInput"
+            v-model="valueModel"
             class="input-shell"
             inputmode="decimal"
             min="0"
             step="any"
             type="text"
-            @focus="activeInput = 'value'"
-            @input="handleValueInput"
           />
         </label>
       </div>
